@@ -2,7 +2,16 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-set "PYTHON=%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe"
+set "PYTHON_CMD="
+where py >nul 2>&1
+if "%ERRORLEVEL%"=="0" set "PYTHON_CMD=py -3"
+if not defined PYTHON_CMD (
+  where python >nul 2>&1
+  if "%ERRORLEVEL%"=="0" set "PYTHON_CMD=python"
+)
+if not defined PYTHON_CMD (
+  if exist "%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe" set "PYTHON_CMD="%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe""
+)
 set "SCRIPT=%~dp0convert_hanja.py"
 set "OUT_DIR=%~dp0output"
 
@@ -24,8 +33,9 @@ if /I not "%IN_EXT%"==".docx" (
   exit /b 1
 )
 
-if not exist "%PYTHON%" (
-  echo [ERROR] python.exe が見つかりません: "%PYTHON%"
+if not defined PYTHON_CMD (
+  echo [ERROR] Python が見つかりません。
+  echo py -3、python、Microsoft Store版Python のいずれも利用できませんでした。
   pause
   exit /b 1
 )
@@ -53,7 +63,7 @@ echo [1/2] 変換中（漢字変換→docx保存）...
 echo ----------------------------------------
 
 rem ===== 通常実行：画面に進行を出す（ログは作らない）=====
-"%PYTHON%" "%SCRIPT%" "%IN_FILE%" "%OUT_DOCX%"
+%PYTHON_CMD% "%SCRIPT%" "%IN_FILE%" "%OUT_DOCX%" --require-pdf
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto MAKELOG_AND_FAIL
 
@@ -84,17 +94,17 @@ set "LOG_FILE=%OUT_DIR%\error_%IN_BASE%_%STAMP:~0,8%_%STAMP:~8,4%.log"
   echo ===== ERROR LOG =====
   echo TIME  : %date% %time%
   echo BAT   : %~f0
-  echo PYTHON: "%PYTHON%"
+  echo PYTHON: %PYTHON_CMD%
   echo SCRIPT: "%SCRIPT%"
   echo INPUT : "%IN_FILE%"
   echo OUTDOCX: "%OUT_DOCX%"
   echo OUTPDF : "%OUT_PDF%"
   echo.
   echo --- Python version ---
-  "%PYTHON%" --version
+  %PYTHON_CMD% --version
   echo.
   echo --- Run script (captured) ---
-  "%PYTHON%" "%SCRIPT%" "%IN_FILE%" "%OUT_DOCX%"
+  %PYTHON_CMD% "%SCRIPT%" "%IN_FILE%" "%OUT_DOCX%" --require-pdf
   echo.
   echo ERRORLEVEL(after run)=%ERRORLEVEL%
   echo.

@@ -2,8 +2,17 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-rem ===== Pythonのパス（指定どおり）=====
-set "PYTHON=%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe"
+rem ===== Pythonコマンドを探索 =====
+set "PYTHON_CMD="
+where py >nul 2>&1
+if "%ERRORLEVEL%"=="0" set "PYTHON_CMD=py -3"
+if not defined PYTHON_CMD (
+  where python >nul 2>&1
+  if "%ERRORLEVEL%"=="0" set "PYTHON_CMD=python"
+)
+if not defined PYTHON_CMD (
+  if exist "%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe" set "PYTHON_CMD="%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe""
+)
 
 rem ===== 設定（必要ならここだけ変更）=====
 set "SCRIPT=%~dp0convert_hanja.py"
@@ -51,10 +60,10 @@ if not exist "%SCRIPT%" (
   exit /b 1
 )
 
-rem ===== Python存在チェック（指定パス）=====
-if not exist "%PYTHON%" (
-  echo [ERROR] Python が見つかりません: %PYTHON%
-  echo Microsoft Store版Pythonが未インストール、またはWindowsAppsが無効の可能性があります。
+rem ===== Python存在チェック =====
+if not defined PYTHON_CMD (
+  echo [ERROR] Python が見つかりません。
+  echo py -3、python、Microsoft Store版Python のいずれも利用できませんでした。
   echo 管理者に Python のインストール／設定を依頼してください。
   echo.
   pause
@@ -64,7 +73,7 @@ if not exist "%PYTHON%" (
 rem ===== 出力ファイルパス =====
 set "OUT_FILE=%OUT_DIR%\%IN_BASE%_hanja.docx"
 
-echo [INFO] Python: %PYTHON%
+echo [INFO] Python: %PYTHON_CMD%
 echo [INFO] 入力ファイル: %IN_NAME%
 echo [INFO] 出力ファイル: %OUT_FILE%
 echo.
@@ -74,9 +83,9 @@ echo [INFO] 変換を開始します
 echo ----------------------------------------
 
 if defined DICT (
-  "%PYTHON%" "%SCRIPT%" "%IN_FILE%" "%OUT_FILE%" "%DICT%"
+  %PYTHON_CMD% "%SCRIPT%" "%IN_FILE%" "%OUT_FILE%" "%DICT%"
 ) else (
-  "%PYTHON%" "%SCRIPT%" "%IN_FILE%" "%OUT_FILE%"
+  %PYTHON_CMD% "%SCRIPT%" "%IN_FILE%" "%OUT_FILE%"
 )
 
 if errorlevel 1 (

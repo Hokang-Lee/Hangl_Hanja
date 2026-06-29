@@ -100,14 +100,24 @@ def get_segments(para_elem):
 
 
 def apply_to_segments(segs, new_full):
+    text_indexes = [i for i, seg in enumerate(segs) if not seg[2]]
+    if not text_indexes:
+        return
+
     pos = 0
-    for seg in segs:
+    last_text_index = text_indexes[-1]
+    for idx, seg in enumerate(segs):
         if seg[2]:
             pos += 1
             continue
         old_len = len(seg[0])
-        seg[1].text = new_full[pos:pos + old_len]
-        pos += old_len
+        if idx == last_text_index:
+            trailing_breaks = sum(1 for future in segs[idx + 1:] if future[2])
+            end_pos = max(pos, len(new_full) - trailing_breaks)
+            seg[1].text = new_full[pos:end_pos]
+        else:
+            seg[1].text = new_full[pos:pos + old_len]
+            pos += old_len
 
 
 # ---------------------------------------------------------------
@@ -377,7 +387,7 @@ def convert_to_pdf(docx_path, pdf_path):
         safe_print("Converting to PDF (docx2pdf)...")
         _pdf_convert(docx_path, pdf_path)
         safe_print(f"PDF:    {pdf_path}")
-        return
+        return True
     except ImportError:
         pass
     except Exception as e:
@@ -399,7 +409,7 @@ def convert_to_pdf(docx_path, pdf_path):
             if lo_out != pdf_path and os.path.exists(lo_out):
                 os.replace(lo_out, pdf_path)
             safe_print(f"PDF:    {pdf_path}")
-            return
+            return True
         except Exception as e:
             safe_print(f"LibreOffice failed: {e}")
 
@@ -407,6 +417,7 @@ def convert_to_pdf(docx_path, pdf_path):
     safe_print("  To enable PDF output, run one of:")
     safe_print("    pip install docx2pdf       (requires Microsoft Word)")
     safe_print("    Install LibreOffice        (free)")
+    return False
 
 
 def find_dict_file(script_dir):
@@ -424,7 +435,7 @@ def find_dict_file(script_dir):
     return candidates[0][1]
 
 
-def convert(input_path, output_path=None, dict_path=None):
+def convert(input_path, output_path=None, dict_path=None, require_pdf=False):
     if output_path is None:
         base, ext = os.path.splitext(input_path)
         output_path = base + "_hanja" + ext
@@ -455,8 +466,8 @@ def convert(input_path, output_path=None, dict_path=None):
             try:
                 hf_paras = hf._element.findall(f".//{{{NS}}}p")
                 hf_changed += process_paragraphs(hf_paras, main_dict, kyuji_table)
-            except Exception:
-                pass
+            except Exception as e:
+                safe_print(f"WARNING: header/footer conversion skipped: {e}")
 
     # Font unify
     safe_print(f"Setting font to {FONT_NAME} ...")
@@ -467,8 +478,8 @@ def convert(input_path, output_path=None, dict_path=None):
                    section.first_page_header, section.first_page_footer]:
             try:
                 set_font_all(hf._element, FONT_NAME)
-            except Exception:
-                pass
+            except Exception as e:
+                safe_print(f"WARNING: header/footer font conversion skipped: {e}")
 
     # Condense parentheses width
     safe_print("Condensing parentheses text width to 95% ...")
@@ -479,8 +490,8 @@ def convert(input_path, output_path=None, dict_path=None):
                    section.first_page_header, section.first_page_footer]:
             try:
                 width_changed += condense_parentheses_width(hf._element, percent=95)
-            except Exception:
-                pass
+            except Exception as e:
+                safe_print(f"WARNING: header/footer width conversion skipped: {e}")
     safe_print(f"Width changed: {width_changed} run/part(s)")
 
     doc.save(output_path)
@@ -488,7 +499,10 @@ def convert(input_path, output_path=None, dict_path=None):
     safe_print(f"Changed: {body_changed} body para(s), {hf_changed} header/footer para(s)")
 
     pdf_path = os.path.splitext(output_path)[0] + ".pdf"
-    convert_to_pdf(output_path, pdf_path)
+    pdf_ok = convert_to_pdf(output_path, pdf_path)
+    if require_pdf and not pdf_ok:
+        safe_print("ERROR: PDF conversion failed.")
+        sys.exit(2)
     safe_print("Done.")
 
 
@@ -496,7 +510,12 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         safe_print(__doc__)
         sys.exit(1)
-    inp = sys.argv[1]
-    outp = sys.argv[2] if len(sys.argv) > 2 else None
-    dic = sys.argv[3] if len(sys.argv) > 3 else None
-    convert(inp, outp, dic)
+    require_pdf = "--require-pdf" in sys.argv[1:]
+    args = [arg for arg in sys.argv[1:] if arg != "--require-pdf"]
+    if not args:
+        safe_print(__doc__)
+        sys.exit(1)
+    inp = args[0]
+    outp = args[1] if len(args) > 1 else None
+    dic = args[2] if len(args) > 2 else None
+    convert(inp, outp, dic, require_pdf=require_pdf)

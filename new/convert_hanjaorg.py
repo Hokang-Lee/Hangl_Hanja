@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Legacy reference version. Use convert_hanja.py for normal operation.
 """
 Korean to Hanja converter for Word (.docx) files
 - Reads main dictionary from Excel Sheet1 (col A=Korean, col C=Hanja)

@@ -9,10 +9,26 @@ if "%~1"=="" (
     exit /b
 )
 
-set PYTHON=%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe
+set "PYTHON_CMD="
+where py >nul 2>&1
+if "%ERRORLEVEL%"=="0" set "PYTHON_CMD=py -3"
+if not defined PYTHON_CMD (
+    where python >nul 2>&1
+    if "%ERRORLEVEL%"=="0" set "PYTHON_CMD=python"
+)
+if not defined PYTHON_CMD (
+    if exist "%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe" set "PYTHON_CMD="%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe""
+)
 
-echo Using: %PYTHON%
-"%PYTHON%" "%~dp0convert_hanja.py" %*
+if not defined PYTHON_CMD (
+    echo ERROR: Python was not found.
+    echo Please install Python or add it to PATH.
+    pause
+    exit /b 1
+)
+
+echo Using: %PYTHON_CMD%
+%PYTHON_CMD% "%~dp0convert_hanja.py" %*
 
 if errorlevel 1 (
     echo.
